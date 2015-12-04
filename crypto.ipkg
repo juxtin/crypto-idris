@@ -1,0 +1,8 @@
+package crypto
+
+modules = Crypto.B64, Crypto
+
+sourcedir = src
+
+main = Crypto
+executable = crypto
