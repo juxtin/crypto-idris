@@ -1,6 +1,6 @@
 package crypto
 
-modules = Crypto.Data, Crypto
+modules = Crypto.Data, Crypto, Crypto.XOR
 
 sourcedir = src
 
