@@ -1,6 +1,7 @@
 module Main
 
 import Crypto.Data
+import Crypto.XOR
 
 failMessage : String -> String -> String
 failMessage expected actual =

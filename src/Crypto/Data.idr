@@ -217,40 +217,24 @@ binToHex bits =
   let bytes = bitPartition 4 bits in
     mapMaybe byteToHex bytes
 
-xorBit : BinaryDigit -> BinaryDigit -> BinaryDigit
-xorBit O O = O
-xorBit I I = O
-xorBit _ _ = I
+hexToASCII' : (Char, Char) -> Maybe String
+hexToASCII' (a, b) =
+  let str = pack $ the (List Char) [a, b] in
+    do n <- hexToDecimal str
+       bits <- Just $ decimalToBinary n
+       bytes <- Just $ bitPartition 7 bits
+       charIdxs <- Just $ map binToDecimal bytes
+       chars <- Just $ map (chr . fromInteger) charIdxs
+       return $ pack chars
 
-||| Given two lists of potentially unequal length, return a pair of both lists
-||| with the smaller one padded to match the length of the larger.
-equalizeLength : (pad : a) -> List a -> List a -> (List a, List a)
-equalizeLength pad xs ys =
-  let longest = max (length xs) (length ys)
-      padx = replicate (longest `minus` (length xs)) pad
-      pady = replicate (longest `minus` (length ys)) pad in
-    ((padx ++ xs), (pady ++ ys))
-
-xor : BinList -> BinList -> BinList
-xor bitsA bitsB =
-  let (xs, ys) = equalizeLength O bitsA bitsB in
-    xor' xs ys
+hexToASCII : String -> Maybe String
+hexToASCII x =
+  let chars = unpack x
+      pairs = pairify chars
+      chars = mapMaybe hexToASCII' pairs in -- bad!!!! will drop characters
+    return $ concat chars
   where
-    xor' : BinList -> BinList -> BinList
-    xor' [] [] = []
-    xor' [] (x :: xs) = x :: xor' [] xs
-    xor' (x :: xs) [] = x :: xor' xs []
-    xor' (x :: xs) (y :: ys) = xorBit x y :: xor' xs ys
-
--- hexToBase64Acceptance : hexToBase64 "49276d206b696c6c696e6720796f757220627261696e206c696b65206120706f69736f6e6f7573206d757368726f6f6d" = Just "SSdtIGtpbGxpbmcgeW91ciBicmFpbiBsaWtlIGEgcG9pc29ub3VzIG11c2hyb29t"
--- hexToBase64Acceptance = ?acceptance
-
-fixedXOR : String -> String -> Maybe String
-fixedXOR x y =
-  do hexA <- hexToDecimal x
-     hexB <- hexToDecimal y
-     binA <- Just $ decimalToBinary hexA
-     binB <- Just $ decimalToBinary hexB
-     xord <- Just $ xor binA binB
-     hexChars <- Just $ binToHex xord
-     return $ pack $ map hexDigitToChar hexChars
+    pairify : List Char -> List (Char, Char)
+    pairify [] = []
+    pairify (y :: []) = [('0', y)]
+    pairify (y :: (z :: xs)) = (y, z) :: pairify xs
