@@ -1,6 +1,6 @@
 package crypto
 
-modules = Crypto.B64, Crypto
+modules = Crypto.Data, Crypto
 
 sourcedir = src
 
