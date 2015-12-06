@@ -29,10 +29,39 @@ xor bitsA bitsB =
 
 fixedXOR : String -> String -> Maybe String
 fixedXOR x y =
-  do hexA <- hexToDecimal x
-     hexB <- hexToDecimal y
-     binA <- Just $ decimalToBinary hexA
-     binB <- Just $ decimalToBinary hexB
-     xord <- Just $ xor binA binB
-     hexChars <- Just $ binToHex xord
-     return $ pack $ map hexDigitToChar hexChars
+  let (bitx, bity) = (toUpper x, toUpper y) in
+    if not $ isHexStr bitx && isHexStr bity then Nothing
+    else do hexA <- hexToDecimal bitx
+            hexB <- hexToDecimal bity
+            binA <- Just $ decimalToBinary hexA
+            binB <- Just $ decimalToBinary hexB
+            xord <- Just $ xor binA binB
+            hexChars <- Just $ binToHex xord
+            return $ pack $ map hexDigitToChar hexChars
+
+letters : String -> List String
+letters = map singleton . unpack
+
+xorCypher : (cypher : Char) -> String -> Maybe String
+xorCypher cypher x =
+  if not $ isHexStr x && isHexChar cypher then Nothing
+  else do return $ concat $ mapMaybe (fixedXOR $ singleton cypher) $ letters x
+
+bruteForce : String -> IO ()
+bruteForce x =
+  let hex = toUpper x in
+    attempt hex possibleKeys
+  where
+    possibleKeys : List Char
+    possibleKeys = unpack "0123456789ABCDEF"
+    attempt : String -> List Char -> IO ()
+    attempt x [] = return ()
+    attempt x (key::keys) =
+      case xorCypher key x of
+        Nothing => do putStrLn $ "failed to xorCypher with " ++ (show key)
+                      attempt x keys
+        Just res => case hexToASCII res of
+                      Nothing => do putStrLn $ "failed to hexToASCII with " ++ res
+                                    attempt x keys
+                      Just str => do putStrLn $ (show key) ++ "= " ++ str
+                                     attempt x keys

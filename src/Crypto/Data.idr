@@ -7,6 +7,9 @@ import Data.Vect
 data BinaryDigit = O | I
 %name BinaryDigit bit
 
+Bits : Nat -> Type
+Bits n = Vect n BinaryDigit
+
 bitToDecimal : BinaryDigit -> Integer
 bitToDecimal O = 0
 bitToDecimal I = 1
@@ -74,25 +77,44 @@ BinList : Type
 BinList = List BinaryDigit
 %name BinList bits
 
-pad : Nat -> BinList -> BinList
-pad n xs = let diff = n `minus` (length xs) in
-               replicate diff O ++ xs
+binToDecimal : BinList -> Integer
+binToDecimal xs =
+  binToDecimal' 0 Z $ reverse xs
+  where
+    binToDecimal' : (acc : Integer) -> (pos : Nat) -> BinList -> Integer
+    binToDecimal' acc _ [] = acc
+    binToDecimal' acc pos (bit :: bits) =
+      let n = bitToDecimal bit in
+        binToDecimal' (acc + (n * (2 `pow` pos))) (pos + 1) bits
+
+binToNat : BinList -> Nat
+binToNat = cast . binToDecimal
+
+binToInt : Bits n -> Integer
+binToInt = binToInt' . reverse
+  where
+    binToInt' : Bits n -> Integer
+    binToInt' [] = 0
+    binToInt' (x :: xs) =
+      (+) (bitToDecimal x) $ 2 * (binToInt' xs)
+
+partial
+byteMaxSize : (n : Nat) -> binToInt (replicate n I) = (2 `pow` n) - 1
+byteMaxSize (S (S (S (S Z)))) = Refl -- 4
+byteMaxSize (S (S (S (S (S (S Z)))))) = Refl -- 6
+byteMaxSize (S (S (S (S (S (S (S Z))))))) = Refl -- 7
+
+binToFin : Bits n -> Fin $ 2 `pow` n
+binToFin {n} x =
+  case natToFin (cast $ binToInt x) (2 `pow` n) of
+    Just fin => fin
+    Nothing => believe_me 0 -- this should be unreachable anyway, but the
+                            -- believe_me is necessary because the compiler
+                            -- claims that FZ is not strictly less than (pow 2 n),
+                            -- but obviously it is.
 
 Byte : Type
 Byte = Vect 8 BinaryDigit
-
-hexCharToDecimal : Char -> Maybe Integer
-hexCharToDecimal x =
-  if isDigit x
-  then Just $ cast $ singleton x
-  else case x of
-    'A' => Just 10
-    'B' => Just 11
-    'C' => Just 12
-    'D' => Just 13
-    'E' => Just 14
-    'F' => Just 15
-    _   => Nothing
 
 isHexChar : Char -> Bool
 isHexChar x =
@@ -101,28 +123,68 @@ isHexChar x =
     hexChars : List Char
     hexChars = unpack "ABCDEF"
 
-hexToDecimal : String -> Maybe Integer
-hexToDecimal x =
-  let chars = reverse $ unpack $ toUpper x in
-    hexToDecimal' 0 Z chars
-  where
-    hexToDecimal' : (acc : Integer) -> (pos : Nat) -> List Char -> Maybe Integer
-    hexToDecimal' acc _ [] = Just acc
-    hexToDecimal' acc pos (char::chars) =
-      case hexCharToDecimal char of
-        Nothing => Nothing
-        Just n  => hexToDecimal' (acc + (n * (16 `pow` pos))) (pos + 1) chars
+isHexStr : String -> Bool
+isHexStr x = all isHexChar $ unpack x
 
-hexEx1 : hexToDecimal "1D9" = Just 473
+Hex : Type
+Hex = List HexDigit
+
+parseHexChar : Char -> Maybe HexDigit
+parseHexChar x =
+  case x of
+    '0' => Just H0
+    '1' => Just H1
+    '2' => Just H2
+    '3' => Just H3
+    '4' => Just H4
+    '5' => Just H5
+    '6' => Just H6
+    '7' => Just H7
+    '8' => Just H8
+    '9' => Just H9
+    'A' => Just HA
+    'B' => Just HB
+    'C' => Just HC
+    'D' => Just HD
+    'E' => Just HE
+    'F' => Just HF
+    _   => Nothing
+
+parseHex : String -> Maybe Hex
+parseHex str =
+  let x = toUpper str in
+    if isHexStr x
+      then Just $ mapMaybe parseHexChar $ unpack x
+      else Nothing
+
+hexToDecimal : Hex -> Integer
+hexToDecimal hex =
+  let digits = reverse hex in
+    hexToDecimal' 0 Z digits
+  where
+    hexToDecimal' : (acc : Integer) -> (pos : Nat) -> Hex -> Integer
+    hexToDecimal' acc _ [] = acc
+    hexToDecimal' acc pos (hex::hexs) =
+      let n = hexDigitToInt hex
+          multiplier = 16 `pow` pos
+          newAcc = (acc + (n * multiplier)) in
+        hexToDecimal' newAcc (pos + 1) hexs
+
+hexStrToDecimal : String -> Maybe Integer
+hexStrToDecimal s =
+  do hex <- parseHex s
+     return $ hexToDecimal hex
+
+hexEx1 : hexStrToDecimal "1D9" = Just 473
 hexEx1 = Refl
 
-hexEx2 : hexToDecimal "80E1" = Just 32993
+hexEx2 : hexStrToDecimal "80E1" = Just 32993
 hexEx2 = Refl
 
-hexEx3 : hexToDecimal "10CE" = Just 4302
+hexEx3 : hexStrToDecimal "10CE" = Just 4302
 hexEx3 = Refl
 
-hexEx4 : hexToDecimal "877HOTLINEBLING" = Nothing
+hexEx4 : hexStrToDecimal "877HOTLINEBLING" = Nothing
 hexEx4 = Refl
 
 isEven : Integer -> Bool
@@ -146,23 +208,23 @@ binListShow (x :: xs) =
 decimalToBinary : Integer -> BinList
 decimalToBinary = decimalToBinary' []
 
-binToDecimal : BinList -> Integer
-binToDecimal xs =
-  binToDecimal' 0 Z $ reverse xs
+HexByte : Type
+HexByte = Vect 4 BinaryDigit
+
+||| Constructs a vector of size n given a list. Intended to be used with bytes,
+||| so elements are added (as `def`) or dropped from the beginning if necessary.
+vectSizer : (n : Nat) -> (def : a) -> List a -> Vect n a
+vectSizer n def xs =
+  reverse $ vectSizer' n def $ reverse xs
   where
-    binToDecimal' : (acc : Integer) -> (pos : Nat) -> BinList -> Integer
-    binToDecimal' acc _ [] = acc
-    binToDecimal' acc pos (bit :: bits) =
-      let n = bitToDecimal bit in
-        binToDecimal' (acc + (n * (2 `pow` pos))) (pos + 1) bits
+    vectSizer' Z def xs = []
+    vectSizer' (S k) def [] = def :: vectSizer' k def []
+    vectSizer' (S k) def (x :: xs) = x :: vectSizer' k def xs
 
-binToNat : BinList -> Nat
-binToNat = cast . binToDecimal
-
-hexToBinary : Char -> Maybe BinList
+hexToBinary : HexDigit -> HexByte
 hexToBinary x =
-  do n <- hexCharToDecimal x
-     return $ pad 4 $ decimalToBinary n
+  let n = hexDigitToInt x in
+     vectSizer 4 O $ decimalToBinary n
 
 -- hex index is 4 bits
 -- b64 index is 6 bits
@@ -179,13 +241,13 @@ sizePartition : (size : Nat) -> List a -> List $ List a
 sizePartition size [] = []
 sizePartition size bits = (take size bits) :: (sizePartition size $ drop size bits)
 
-||| Divides the given BinList into a list of BinLists which are all _exactly_
-||| `size` in length. Pads the BinList with initial O's if necessary.
-bitPartition : (size : Nat) -> BinList -> List BinList
+||| Divides the given BinList into a list of Byte vectors which are all
+||| `n` in length. Pads the BinList with initial O's if necessary.
+bitPartition : (n : Nat) -> BinList -> List $ Bits n
 bitPartition size bits =
   let padding = getPadding size bits
       padded = padding ++ bits in
-    sizePartition size padded
+    map (vectSizer size O) $ sizePartition size padded
   where
     getPadding : Nat -> BinList -> BinList
     getPadding size bits =
@@ -193,48 +255,61 @@ bitPartition size bits =
           deficit = size `minus` smallChunk in
         replicate deficit O
 
-base64Index : BinList -> Maybe Char
+base64Index : Bits 6 -> Char
 base64Index bits =
-  let n = binToNat bits in
-    do idx <- natToFin n 64
-       return $ index idx base64Chars
+  let idx = binToFin bits in
+    index idx base64Chars
+
+hexToBase64' : List $ Bits 4 -> List $ Bits 6
+hexToBase64' [] = []
+hexToBase64' bits =
+  let n = map binToInt bits in
+    bitPartition 6 $ concat $ map decimalToBinary n
 
 hexToBase64 : String -> Maybe String
 hexToBase64 x =
-  do n <- hexToDecimal x
-     bits <- Just $ decimalToBinary n
-     bytes <- Just $ bitPartition 6 bits
-     chars <- Just $ mapMaybe base64Index bytes
-     return $ pack chars
+  case hexStrToDecimal x of
+    Nothing => Nothing
+    Just n => Just ?stuff
 
-byteToHex : BinList -> Maybe HexDigit
-byteToHex bits =
-  do n <- natToFin (cast $ binToDecimal bits) 16
-     return $ finToHex n
+-- byteToHex : BinList -> Maybe HexDigit
+-- byteToHex bits =
+--   do n <- natToFin (cast $ binToDecimal bits) 16
+--      return $ finToHex n
 
-binToHex : BinList -> List HexDigit
-binToHex bits =
-  let bytes = bitPartition 4 bits in
-    mapMaybe byteToHex bytes
+-- binToHex : BinList -> List HexDigit
+-- binToHex bits =
+--   let bytes = bitPartition 4 bits in
+--     mapMaybe byteToHex bytes
 
-hexToASCII' : (Char, Char) -> Maybe String
-hexToASCII' (a, b) =
-  let str = pack $ the (List Char) [a, b] in
-    do n <- hexToDecimal str
-       bits <- Just $ decimalToBinary n
-       bytes <- Just $ bitPartition 7 bits
-       charIdxs <- Just $ map binToDecimal bytes
-       chars <- Just $ map (chr . fromInteger) charIdxs
-       return $ pack chars
+-- hexToASCII' : (Char, Char) -> Maybe String
+-- hexToASCII' (a, b) =
+--   let str = pack $ the (List Char) [a, b] in
+--     do n <- hexToDecimal str
+--        bits <- Just $ decimalToBinary n
+--        charIdx <- Just $ binToDecimal bits
+--        char <- Just $ chr $ fromInteger charIdx
+--        return $ singleton char
 
-hexToASCII : String -> Maybe String
-hexToASCII x =
-  let chars = unpack x
-      pairs = pairify chars
-      chars = mapMaybe hexToASCII' pairs in -- bad!!!! will drop characters
-    return $ concat chars
-  where
-    pairify : List Char -> List (Char, Char)
-    pairify [] = []
-    pairify (y :: []) = [('0', y)]
-    pairify (y :: (z :: xs)) = (y, z) :: pairify xs
+-- hexToASCII : String -> Maybe String
+-- hexToASCII x =
+--   if not $ isHexStr x then Nothing
+--   else let chars = unpack x
+--            pairs = pairify chars
+--            chars = mapMaybe hexToASCII' pairs in
+--          return $ concat chars
+--   where
+--     pairify : List Char -> List (Char, Char)
+--     pairify [] = []
+--     pairify (y :: []) = [('0', y)]
+--     pairify (y :: (z :: xs)) = (y, z) :: pairify xs
+
+-- asciiToHex : String -> String
+-- asciiToHex x =
+--   let chars = unpack x
+--       bytes = concat $ map (bitPartition 4 . decimalToBinary . cast . ord) chars
+--       hexChars = map hexDigitToChar $ mapMaybe byteToHex bytes in
+--     pack hexChars
+
+-- asciiRoundTrip : String -> Maybe String
+-- asciiRoundTrip = hexToASCII . asciiToHex

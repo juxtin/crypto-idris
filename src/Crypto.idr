@@ -35,6 +35,13 @@ let inputA = "1c0111001f010100061a024b53535009181c"
     expected = "746865206B696420646F6E277420706C6179" in
   testIO expected (fixedXOR inputA inputB)
 
+test3 : IO ()
+test3 =
+  let input = "1b37373331363f78151b7f2b783431333d78397828372d363c78373e783a393b3736" in
+    bruteForce input
+
+
+
 main : IO ()
 main =
   do putStrLn "Challenge 1:"
@@ -42,3 +49,6 @@ main =
      putStrLn ""
      putStrLn "Challenge 2:"
      test2
+     putStrLn ""
+     putStrLn "Brute-forcing challenge 3:"
+     test3
