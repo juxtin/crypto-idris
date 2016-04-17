@@ -2,6 +2,7 @@ module Crypto.Data
 
 import Data.Fin
 import Data.Vect
+%access public export
 
 data BinaryDigit = O | I
 %name BinaryDigit bit
