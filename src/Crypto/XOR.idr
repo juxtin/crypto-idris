@@ -1,6 +1,7 @@
 module Crypto.XOR
 
 import Crypto.Data
+import Data.Vect
 %access public export
 
 xorBit : BinaryDigit -> BinaryDigit -> BinaryDigit
@@ -28,6 +29,9 @@ xor bitsA bitsB =
     xor' (x :: xs) [] = x :: xor' xs []
     xor' (x :: xs) (y :: ys) = xorBit x y :: xor' xs ys
 
+byteXor : Bits 8 -> Bits 8 -> Bits 8
+byteXor = zipWith xorBit
+
 fixedXOR : String -> String -> Maybe String
 fixedXOR x y =
   let (bitx, bity) = (toUpper x, toUpper y) in
@@ -43,27 +47,34 @@ fixedXOR x y =
 letters : String -> List String
 letters = map singleton . unpack
 
-xorCypher : (cypher : Char) -> String -> Maybe String
-xorCypher cypher x =
-  if not $ isHexStr x && isHexChar cypher then Nothing
-  else do return $ concat $ mapMaybe (fixedXOR $ singleton cypher) $ letters x
+xorCypher' : Char -> List (Bits 8) -> String
+xorCypher' key bytes =
+  let keyByte = vectSizer 8 O $ decimalToBinary $ cast $ ord key
+      xord = map (byteXor keyByte) bytes
+   in
+      pack $ map (chr . fromInteger . binToInt) xord
+
+xorCypher : Char -> String -> Maybe String
+xorCypher key str =
+  do dec <- hexStrToDecimal str
+     let bytes = bitPartition 8 $ decimalToBinary dec
+     pure $ xorCypher' key bytes
 
 bruteForce : String -> IO ()
 bruteForce x =
-  let hex = toUpper x in
-    attempt hex possibleKeys
+  case hexStrToDecimal x of
+    Nothing => putStrLn $ "Unable to parse " ++ x ++ " as hex."
+    Just dec => attempt possibleKeys $ bitPartition 8 $ decimalToBinary dec
   where
     possibleKeys : List Char
     possibleKeys = map chr $ enumFromTo 65 122
-    attempt : String -> List Char -> IO ()
-    attempt x [] = pure ()
-    attempt x (key::keys) =
-      case xorCypher key x of
-        Nothing => do putStrLn $ "failed to xorCypher with " ++ (show key)
-                      attempt x keys
-        Just res => case hexToASCII res of
-                      Nothing => do putStrLn $ "failed to hexToASCII with " ++ res
-                                    attempt x keys
-                      Just str => do putStrLn $ (show key) ++ "= " ++ str
-                                     attempt x keys
-
+    attempt : List Char -> List (Bits 8) -> IO ()
+    attempt [] x = pure ()
+    attempt _ [] = putStrLn "No bytes!"
+    attempt (key :: keys) bytes =
+      let keyByte = vectSizer 8 O $ decimalToBinary $ cast $ ord key
+          xord = map (byteXor keyByte) bytes
+          result = pack $ map (chr . fromInteger . binToInt) xord
+       in
+        do putStrLn $ (show key) ++ "=" ++ result
+           attempt keys bytes
