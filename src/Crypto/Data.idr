@@ -266,50 +266,59 @@ hexToBase64' bits =
   let n = map binToInt bits in
     bitPartition 6 $ concat $ map decimalToBinary n
 
+integerToBase64' : Integer -> List $ Bits 6
+integerToBase64' x =
+  let bits = decimalToBinary x in
+    bitPartition 6 bits
+
+integerToBase64 : Integer -> String
+integerToBase64 = pack . map base64Index . integerToBase64'
+
 hexToBase64 : String -> Maybe String
 hexToBase64 x =
   case hexStrToDecimal x of
     Nothing => Nothing
-    Just n => Just ?stuff
+    Just n => Just $ integerToBase64 n
 
--- byteToHex : BinList -> Maybe HexDigit
--- byteToHex bits =
---   do n <- natToFin (cast $ binToDecimal bits) 16
---      return $ finToHex n
+byteToHex : BinList -> Maybe HexDigit
+byteToHex bits =
+  do n <- natToFin (cast $ binToDecimal bits) 16
+     return $ finToHex n
 
--- binToHex : BinList -> List HexDigit
--- binToHex bits =
---   let bytes = bitPartition 4 bits in
---     mapMaybe byteToHex bytes
+binToHex : BinList -> List HexDigit
+binToHex bits =
+  let bytes = bitPartition 4 bits in
+      map (finToHex . binToFin) bytes
 
--- hexToASCII' : (Char, Char) -> Maybe String
--- hexToASCII' (a, b) =
---   let str = pack $ the (List Char) [a, b] in
---     do n <- hexToDecimal str
---        bits <- Just $ decimalToBinary n
---        charIdx <- Just $ binToDecimal bits
---        char <- Just $ chr $ fromInteger charIdx
---        return $ singleton char
+hexToASCII' : (Char, Char) -> Maybe String
+hexToASCII' (a, b) =
+  let str = pack $ the (List Char) [a, b] in
+    do n <- hexStrToDecimal str
+       let bits = decimalToBinary n
+       let charIdx = binToDecimal bits
+       let char = chr $ fromInteger charIdx
+       pure $ singleton char
 
--- hexToASCII : String -> Maybe String
--- hexToASCII x =
---   if not $ isHexStr x then Nothing
---   else let chars = unpack x
---            pairs = pairify chars
---            chars = mapMaybe hexToASCII' pairs in
---          return $ concat chars
---   where
---     pairify : List Char -> List (Char, Char)
---     pairify [] = []
---     pairify (y :: []) = [('0', y)]
---     pairify (y :: (z :: xs)) = (y, z) :: pairify xs
+hexToASCII : String -> Maybe String
+hexToASCII x =
+  if not $ isHexStr x then Nothing
+  else let chars = unpack x
+           pairs = pairify chars
+           chars = mapMaybe hexToASCII' pairs in
+         return $ concat chars
+  where
+    pairify : List Char -> List (Char, Char)
+    pairify [] = []
+    pairify (y :: []) = [('0', y)]
+    pairify (y :: (z :: xs)) = (y, z) :: pairify xs
 
--- asciiToHex : String -> String
--- asciiToHex x =
---   let chars = unpack x
---       bytes = concat $ map (bitPartition 4 . decimalToBinary . cast . ord) chars
---       hexChars = map hexDigitToChar $ mapMaybe byteToHex bytes in
---     pack hexChars
+asciiToHex : String -> String
+asciiToHex x =
+  let chars = unpack x
+      bytes = concat $ map (bitPartition 4 . decimalToBinary . cast . ord) chars
+      hexes = map (finToHex . binToFin) bytes
+   in
+    pack $ map hexDigitToChar hexes
 
--- asciiRoundTrip : String -> Maybe String
--- asciiRoundTrip = hexToASCII . asciiToHex
+asciiRoundTrip : String -> Maybe String
+asciiRoundTrip = hexToASCII . asciiToHex
