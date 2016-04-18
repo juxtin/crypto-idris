@@ -1,6 +1,7 @@
 module Crypto.XOR
 
 import Crypto.Data
+%access public export
 
 xorBit : BinaryDigit -> BinaryDigit -> BinaryDigit
 xorBit O O = O
@@ -31,8 +32,8 @@ fixedXOR : String -> String -> Maybe String
 fixedXOR x y =
   let (bitx, bity) = (toUpper x, toUpper y) in
     if not $ isHexStr bitx && isHexStr bity then Nothing
-    else do hexA <- hexToDecimal bitx
-            hexB <- hexToDecimal bity
+    else do hexA <- hexStrToDecimal bitx
+            hexB <- hexStrToDecimal bity
             binA <- Just $ decimalToBinary hexA
             binB <- Just $ decimalToBinary hexB
             xord <- Just $ xor binA binB
@@ -53,9 +54,9 @@ bruteForce x =
     attempt hex possibleKeys
   where
     possibleKeys : List Char
-    possibleKeys = unpack "0123456789ABCDEF"
+    possibleKeys = map chr $ enumFromTo 65 122
     attempt : String -> List Char -> IO ()
-    attempt x [] = return ()
+    attempt x [] = pure ()
     attempt x (key::keys) =
       case xorCypher key x of
         Nothing => do putStrLn $ "failed to xorCypher with " ++ (show key)
@@ -65,3 +66,4 @@ bruteForce x =
                                     attempt x keys
                       Just str => do putStrLn $ (show key) ++ "= " ++ str
                                      attempt x keys
+
