@@ -255,6 +255,11 @@ bitPartition size bits =
           deficit = size `minus` smallChunk in
         replicate deficit O
 
+hexStrToBytes : String -> Maybe $ List $ Bits 8
+hexStrToBytes x =
+  do dec <- hexStrToDecimal x
+     pure $ bitPartition 8 $ decimalToBinary dec
+
 base64Index : Bits 6 -> Char
 base64Index bits =
   let idx = binToFin bits in

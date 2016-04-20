@@ -56,25 +56,21 @@ xorCypher' key bytes =
 
 xorCypher : Char -> String -> Maybe String
 xorCypher key str =
-  do dec <- hexStrToDecimal str
-     let bytes = bitPartition 8 $ decimalToBinary dec
+  do bytes <- hexStrToBytes str
      pure $ xorCypher' key bytes
 
 bruteForce : String -> IO ()
 bruteForce x =
-  case hexStrToDecimal x of
+  case hexStrToBytes x of
     Nothing => putStrLn $ "Unable to parse " ++ x ++ " as hex."
-    Just dec => attempt possibleKeys $ bitPartition 8 $ decimalToBinary dec
+    Just bytes => attempt possibleKeys bytes
   where
     possibleKeys : List Char
     possibleKeys = map chr $ enumFromTo 65 122
     attempt : List Char -> List (Bits 8) -> IO ()
     attempt [] x = pure ()
-    attempt _ [] = putStrLn "No bytes!"
     attempt (key :: keys) bytes =
-      let keyByte = vectSizer 8 O $ decimalToBinary $ cast $ ord key
-          xord = map (byteXor keyByte) bytes
-          result = pack $ map (chr . fromInteger . binToInt) xord
+      let result = xorCypher' key bytes
        in
         do putStrLn $ (show key) ++ "=" ++ result
            attempt keys bytes
